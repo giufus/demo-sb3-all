@@ -1,5 +1,6 @@
 
 # Demo SB3 
+[![Java CI with Maven](https://github.com/giufus/demo-sb3-all/actions/workflows/maven.yml/badge.svg)](https://github.com/giufus/demo-sb3-all/actions/workflows/maven.yml)  
 
 #### A sample Spring Boot 3 Project to try some features and libs:   
 - [Testcontainers ](https://www.testcontainers.org/)
