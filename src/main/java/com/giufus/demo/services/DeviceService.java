@@ -2,14 +2,13 @@ package com.giufus.demo.services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.giufus.demo.Configurations;
 import com.giufus.demo.models.DeviceMessage;
 import com.rabbitmq.stream.*;
 import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -18,7 +17,6 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
 
 @Service
 public class DeviceService {
@@ -45,7 +43,7 @@ public class DeviceService {
 
         deviceMessage.stream()
                 .forEach(dm -> {
-                    String messageId = String.format("%s-%s", dm.deviceId(), UUID.randomUUID());
+
                     final String deviceMessageAsJson;
                     try {
                         deviceMessageAsJson = objectMapper.writeValueAsString(dm);
@@ -55,8 +53,9 @@ public class DeviceService {
 
                     Message message = producer.messageBuilder()
                             .properties()
-                            .creationTime(System.currentTimeMillis())
-                            .messageId(messageId)
+                                .creationTime(System.currentTimeMillis())
+                                .messageId(String.format("%s-%s", dm.deviceId(), UUID.randomUUID()))
+                                .correlationId(String.format("%s-%s", dm.deviceId(), UUID.randomUUID()))
                             .messageBuilder()
                             .addData(deviceMessageAsJson.getBytes(StandardCharsets.UTF_8))
                             .build();
@@ -72,35 +71,38 @@ public class DeviceService {
                 done ? "yes" : "no",
                 (System.currentTimeMillis() - start)
         );
-
     }
 
+    public int consumeMessages(@NotNull String queue, Integer consumerTime) {
 
-    public AtomicInteger consumeMessages(@NotNull String queue, Long offset, Integer countMessages) {
-
-        // How much to consume 1 million message ? 7 s in mac m1, with no tuning
-        long start = System.currentTimeMillis();
-        AtomicInteger sum = new AtomicInteger(0);
-        CountDownLatch million = new CountDownLatch(countMessages);
+        String streamName = Configurations.appendDateString(queue);
+        AtomicInteger count = new AtomicInteger(0);
         Consumer consumer = environment.consumerBuilder()
-                .stream(queue)
-                .offset(offset != null ? OffsetSpecification.offset(offset) : OffsetSpecification.first())
+                // enable if you want offset tracking
+                //.name("consumer-" + streamName)
+                .stream(streamName)
+                // not needed if you want offset tracking
+                .offset(OffsetSpecification.first())
                 .messageHandler((context, message) -> {
-                    log.info("Message consumed {}", new String(message.getBodyAsBinary()));
-                    sum.addAndGet(1);
-                    million.countDown();
+                    try {
+                        log.info("Message consumed {} - offset is {}  - timestamp is {}",
+                                    new String(message.getBodyAsBinary()), context.offset(), context.timestamp()
+                        );
+                        count.addAndGet(1);
+                    } catch (Throwable ex) {
+                        log.error("error reading msg {}", ex);
+                    }
                 })
                 .build();
 
         try {
-            million.await(2, TimeUnit.MINUTES);
-            log.info(String.format("operation lasted %d -  sum is %d", (System.currentTimeMillis() - start) / 1000, sum.get()));
+            Thread.currentThread().sleep(consumerTime);
             consumer.close();
         } catch (Exception e) {
-            log.error("error is {}", e);
-            throw new RuntimeException(e);
+            log.error("{}", e);
         }
 
-        return sum;
+        return count.get();
+
     }
 }

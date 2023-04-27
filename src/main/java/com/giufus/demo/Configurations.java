@@ -1,12 +1,17 @@
 package com.giufus.demo;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rabbitmq.stream.*;
+import com.rabbitmq.stream.Address;
+import com.rabbitmq.stream.Environment;
+import com.rabbitmq.stream.Producer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.format.datetime.DateFormatter;
 
 import java.time.Duration;
+import java.util.Date;
+import java.util.Locale;
 
 @Configuration
 public class Configurations {
@@ -23,17 +28,7 @@ public class Configurations {
     @Value("${custom.rabbitmq.queue.stream.device}")
     private String deviceQueue;
 
-
-
-    /*
-    @Bean(name = "echoWebClient")
-    WebClient produceEchoWebClient(WebClient webClient) {
-        return WebClient.builder()
-                .baseUrl(echoServerUrl)
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .build();
-    }
-    */
+    private static final DateFormatter dateFormatter = new DateFormatter("yyyyMMdd");
 
     @Bean
     Environment getRabbitEnvironment() {
@@ -46,26 +41,35 @@ public class Configurations {
                 .rpcTimeout(Duration.ofMinutes(1))
                 .build();
 
+        environment.streamCreator()
+                .stream(appendDateString(personQueue))
+                .maxAge(Duration.ofHours(8))
+                .create();
 
         environment.streamCreator()
-                .stream(personQueue).create();
-
-        environment.streamCreator()
-                .stream(deviceQueue).create();
+                .stream(appendDateString(deviceQueue))
+                .maxAge(Duration.ofHours(8))
+                .create();
 
         return environment;
     }
 
     @Bean("personProducer")
     Producer getPersonProducer(Environment environment) {
+
         return environment.producerBuilder()
-                .stream(personQueue).build();
+                .name("personProducer")
+                .confirmTimeout(Duration.ZERO)
+                .stream(appendDateString(personQueue)).build();
     }
 
     @Bean("deviceProducer")
     Producer getDeviceProducer(Environment environment) {
+
         return environment.producerBuilder()
-                .stream(deviceQueue).build();
+                .name("deviceProducer")
+                .confirmTimeout(Duration.ZERO)
+                .stream(appendDateString(deviceQueue)).build();
     }
 
     @Bean
@@ -73,4 +77,7 @@ public class Configurations {
         return new ObjectMapper();
     }
 
+    public static String appendDateString(String prefix) {
+        return String.format("%s-%s", prefix, dateFormatter.print(new Date(), Locale.ENGLISH));
+    }
 }
