@@ -58,8 +58,8 @@ public class Configurations {
     Producer getPersonProducer(Environment environment) {
 
         return environment.producerBuilder()
-                .name("personProducer")
-                .confirmTimeout(Duration.ZERO)
+                // enable if you need deduplication, pass publishingId when building message
+                //.name("personProducer")
                 .stream(appendDateString(personQueue)).build();
     }
 
@@ -67,8 +67,8 @@ public class Configurations {
     Producer getDeviceProducer(Environment environment) {
 
         return environment.producerBuilder()
-                .name("deviceProducer")
-                .confirmTimeout(Duration.ZERO)
+                // enable if you need deduplication, pass publishingId when building message
+                //.name("deviceProducer")
                 .stream(appendDateString(deviceQueue)).build();
     }
 

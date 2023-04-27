@@ -57,6 +57,8 @@ public class DeviceService {
                                 .messageId(String.format("%s-%s", dm.deviceId(), UUID.randomUUID()))
                                 .correlationId(String.format("%s-%s", dm.deviceId(), UUID.randomUUID()))
                             .messageBuilder()
+                            //.publishingId("") // use it if you have unique id (line number of file, id of db table..)
+                            // to perform deduplication
                             .addData(deviceMessageAsJson.getBytes(StandardCharsets.UTF_8))
                             .build();
 
@@ -81,7 +83,7 @@ public class DeviceService {
                 // enable if you want offset tracking
                 //.name("consumer-" + streamName)
                 .stream(streamName)
-                // not needed if you want offset tracking
+                // not needed if you want offset tracking, else messages are consumed from the beginning of the stream
                 .offset(OffsetSpecification.first())
                 .messageHandler((context, message) -> {
                     try {
